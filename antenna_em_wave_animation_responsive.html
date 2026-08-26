@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<!-- saved from url=(0085)file:///C:/Users/Two%20Star%20Computer/Downloads/antenna_em_wave_animation_final.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Antenna EM Wave Animation — Final</title>
+<style>
+  :root { --text-primary:#2C2C2A; --text-secondary:#4a4a46; --text-muted:#888780; --border-subtle:#ddd; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background:#faf9f6;
+    color: var(--text-primary);
+    max-width: 760px;
+    margin: 20px auto;
+    padding: 0 16px 40px;
+  }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  p.subtitle { color: var(--text-muted); font-size: 13px; margin-top: 0; margin-bottom: 18px; }
+  button {
+    background:#2C2C2A; color:#fff; border:none; border-radius:6px;
+    padding:6px 12px; font-size:13px; cursor:pointer;
+  }
+  button:hover { opacity:0.9; }
+  input[type=range] { accent-color:#B0392E; }
+  canvas { background: transparent; display:block; width:100%; height:auto; }
+  #cv3 { aspect-ratio: 680 / 150; }
+  #cv2 { aspect-ratio: 680 / 130; }
+  #cv  { aspect-ratio: 680 / 560; }
+
+  @media (max-width: 480px) {
+    body { padding: 0 10px 30px; margin: 10px auto; }
+    h1 { font-size: 17px; }
+    p.subtitle { font-size: 12px; }
+    div[style*="flex-wrap:wrap"] { gap: 10px !important; font-size: 12px !important; }
+    input[type=range] { width: 70px !important; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Antenna EM Wave Animation — Final</h1>
+<p class="subtitle">Grounded AC antenna: voltage control circuit, peak value board, surface charge buildup, and the E/B field generation cascade</p>
+
+<div style="border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px;margin-bottom:10px">
+  <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">Voltage control circuit — drag the wiper to vary the AC source voltage</div>
+  <canvas id="cv3" style="touch-action: none; cursor: grab;" width="680" height="150"></canvas>
+</div>
+
+<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:13px;color:var(--text-secondary)">
+  <button id="playBtn">Pause</button>
+  <label style="display:flex;align-items:center;gap:8px">Frequency
+    <input type="range" id="freq" min="0.5" max="5" step="0.1" value="2" style="width:100px">
+  </label>
+  <label style="display:flex;align-items:center;gap:8px">Spread speed
+    <input type="range" id="delay" min="0.3" max="3" step="0.1" value="1.2" style="width:100px">
+  </label>
+  <label style="display:flex;align-items:center;gap:8px">Tilt
+    <input type="range" id="tilt" min="0" max="0.8" step="0.05" value="0.45" style="width:100px">
+  </label>
+</div>
+
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px;color:var(--text-secondary)">
+  <label style="display:flex;align-items:center;gap:8px;flex:1;max-width:340px">Peak Voltage (V0)
+    <input type="range" id="voltage" min="0.4" max="1.8" step="0.1" value="1" style="flex:1">
+    <span id="voltOut" style="min-width:30px;text-align:right">1.0</span>
+  </label>
+  <span id="scaleOut" style="color:var(--text-muted)">|E| ∝ V0, |B| ∝ V0 — scale x1.0</span>
+</div>
+
+<div style="border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px;margin-bottom:12px">
+  <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px">Peak value variation board — V(t) = V0 sin(ωt), dashed lines mark ±V0</div>
+  <canvas id="cv2" width="680" height="130"></canvas>
+</div>
+
+<canvas id="cv" width="680" height="560"></canvas>
+
+<div style="display:flex;gap:20px;font-size:12px;color:var(--text-muted);margin-top:6px;flex-wrap:wrap">
+  <span><span style="display:inline-block;width:10px;height:10px;background:#D98A3D;border-radius:2px;margin-right:5px"></span>upper point</span>
+  <span><span style="display:inline-block;width:10px;height:10px;background:#7FA83B;border-radius:2px;margin-right:5px"></span>middle point</span>
+  <span><span style="display:inline-block;width:10px;height:10px;background:#4C7EBF;border-radius:2px;margin-right:5px"></span>lower point</span>
+  <span>dots on the antenna surface = charge density, densest at the ends</span>
+</div>
+
+<script>
+(function(){
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const cv2 = document.getElementById('cv2');
+const ctx2 = cv2.getContext('2d');
+const cv3 = document.getElementById('cv3');
+const ctx3 = cv3.getContext('2d');
+const W = 680, H = 560;
+const W2 = 680, H2 = 130;
+const W3 = 680, H3 = 150;
+const dpr = window.devicePixelRatio || 1;
+cv.width = W*dpr; cv.height = H*dpr; ctx.scale(dpr,dpr);
+cv2.width = W2*dpr; cv2.height = H2*dpr; ctx2.scale(dpr,dpr);
+cv3.width = W3*dpr; cv3.height = H3*dpr; ctx3.scale(dpr,dpr);
+
+const playBtn = document.getElementById('playBtn');
+const freqSlider = document.getElementById('freq');
+const delaySlider = document.getElementById('delay');
+const tiltSlider = document.getElementById('tilt');
+const voltageSlider = document.getElementById('voltage');
+const voltOut = document.getElementById('voltOut');
+const scaleOut = document.getElementById('scaleOut');
+
+let running = true, phase = 0, waveT = 0, freq = 2, spreadSpeed = 1.2, tilt = 0.45;
+const vMin = 0.4, vMax = 1.8;
+let voltage = 1;
+
+function primary(){ return getComputedStyle(document.body).getPropertyValue('--text-primary').trim() || '#2C2C2A'; }
+function muted(){ return getComputedStyle(document.body).getPropertyValue('--text-muted').trim() || '#888780'; }
+
+function setVoltage(v){
+  voltage = Math.max(vMin, Math.min(vMax, v));
+  voltageSlider.value = voltage.toFixed(1);
+  voltOut.textContent = voltage.toFixed(1);
+  scaleOut.textContent = '|E| \u221D V0, |B| \u221D V0 — scale x' + voltage.toFixed(1);
+}
+
+playBtn.onclick = () => {
+  running = !running;
+  playBtn.textContent = running ? 'Pause' : 'Play';
+};
+freqSlider.oninput = () => freq = parseFloat(freqSlider.value);
+delaySlider.oninput = () => spreadSpeed = parseFloat(delaySlider.value);
+tiltSlider.oninput = () => tilt = parseFloat(tiltSlider.value);
+voltageSlider.oninput = () => setVoltage(parseFloat(voltageSlider.value));
+setVoltage(1);
+
+const potLeft = 230, potRight = 480, potY = 75, potH = 26;
+let dragging3 = false;
+function wiperX(){ return potLeft + ((voltage-vMin)/(vMax-vMin))*(potRight-potLeft); }
+function pot3PointerX(clientX){
+  const rect = cv3.getBoundingClientRect();
+  return (clientX - rect.left) * (W3/rect.width);
+}
+cv3.addEventListener('pointerdown', e=>{
+  const x = pot3PointerX(e.clientX);
+  if (Math.abs(x - wiperX()) < 30){ dragging3 = true; cv3.style.cursor='grabbing'; }
+});
+window.addEventListener('pointerup', ()=>{ dragging3=false; cv3.style.cursor='grab'; });
+window.addEventListener('pointermove', e=>{
+  if(!dragging3) return;
+  const x = pot3PointerX(e.clientX);
+  const frac = Math.max(0, Math.min(1, (x-potLeft)/(potRight-potLeft)));
+  setVoltage(vMin + frac*(vMax-vMin));
+});
+
+function drawCircuit(){
+  ctx3.clearRect(0,0,W3,H3);
+  const textColor = primary();
+  const srcX = 90, srcY = potY, srcR = 30;
+
+  ctx3.strokeStyle = '#2A6FB0'; ctx3.lineWidth = 3;
+  ctx3.beginPath(); ctx3.arc(srcX, srcY, srcR, 0, Math.PI*2); ctx3.stroke();
+  ctx3.strokeStyle = '#B0392E'; ctx3.lineWidth = 2;
+  ctx3.beginPath();
+  for(let i=0;i<=30;i++){
+    const t = i/30;
+    const x = srcX-16+t*32;
+    const y = srcY + 8*Math.sin(t*Math.PI*2 + phase*1.5);
+    if(i===0) ctx3.moveTo(x,y); else ctx3.lineTo(x,y);
+  }
+  ctx3.stroke();
+  ctx3.fillStyle = textColor; ctx3.font = 'italic 12px Georgia, serif';
+  ctx3.fillText('AC mains', srcX-26, srcY+50);
+
+  ctx3.strokeStyle = textColor; ctx3.lineWidth = 2;
+  ctx3.beginPath();
+  ctx3.moveTo(srcX+srcR, srcY-14); ctx3.lineTo(potLeft, potY-potH/2);
+  ctx3.moveTo(srcX+srcR, srcY+14); ctx3.lineTo(potLeft, potY+potH/2);
+  ctx3.lineTo(potRight, potY+potH/2);
+  ctx3.moveTo(potRight, potY-potH/2); ctx3.lineTo(potRight, potY+potH/2);
+  ctx3.stroke();
+  ctx3.beginPath();
+  ctx3.moveTo(potRight, potY+potH/2); ctx3.lineTo(potRight+20, potY+potH/2);
+  ctx3.stroke();
+
+  ctx3.strokeStyle = textColor; ctx3.lineWidth = 2;
+  ctx3.strokeRect(potLeft, potY-potH/2, potRight-potLeft, potH);
+  ctx3.fillStyle = textColor; ctx3.font = 'italic 12px Georgia, serif';
+  ctx3.fillText('Potentiometer (varies V0)', potLeft+18, potY+potH/2+22);
+
+  const wx = wiperX();
+  ctx3.strokeStyle = '#B0392E'; ctx3.lineWidth = 2.5;
+  ctx3.beginPath();
+  ctx3.moveTo(wx, potY-potH/2-18);
+  ctx3.lineTo(wx, potY-potH/2);
+  ctx3.stroke();
+  ctx3.beginPath();
+  ctx3.moveTo(wx-7, potY-potH/2-18);
+  ctx3.lineTo(wx+7, potY-potH/2-18);
+  ctx3.lineTo(wx, potY-potH/2-8);
+  ctx3.closePath();
+  ctx3.fillStyle = '#B0392E';
+  ctx3.fill();
+
+  ctx3.strokeStyle = textColor; ctx3.lineWidth = 2;
+  ctx3.beginPath();
+  ctx3.moveTo(wx, potY-potH/2-18);
+  ctx3.lineTo(wx, 20);
+  ctx3.lineTo(600, 20);
+  ctx3.lineTo(600, potY);
+  ctx3.stroke();
+  ctx3.beginPath(); ctx3.arc(600, potY, 4, 0, Math.PI*2);
+  ctx3.fillStyle = '#B0392E'; ctx3.fill();
+  ctx3.fillStyle = textColor; ctx3.font = 'italic 12px Georgia, serif';
+  ctx3.fillText('V_out to a.c. source', 520, potY+45);
+  ctx3.font = 'bold 12px sans-serif';
+  ctx3.fillStyle = '#2A6FB0';
+  ctx3.fillText('V0 = ' + voltage.toFixed(1), 600-10, 12);
+}
+
+const squash = 0.30;
+function ringPoint(cx, cy, r, a){
+  const x = r*Math.cos(a);
+  const z = r*Math.sin(a);
+  return { x: cx + x + z*tilt, y: cy + z*squash };
+}
+
+const antennaX = 370, baseY = 480, topY = 190;
+const sourceX = 175, sourceY = 480, sourceR = 38;
+const groundX = 60;
+const stations = [
+  { y: 235, color: '#D98A3D' },
+  { y: 335, color: '#7FA83B' },
+  { y: 425, color: '#4C7EBF' }
+];
+const numRings = 4;
+const angles8 = [0,45,90,135,180,225,270,315].map(d=>d*Math.PI/180);
+const angles4 = [0,90,180,270].map(d=>d*Math.PI/180);
+const antMidY = (topY+baseY)/2, antHalfLen = (baseY-topY)/2;
+
+function drawArrow(x, yTop, yBot, color, alpha, headW, headH){
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = headH>5 ? 2 : 1.2;
+  ctx.globalAlpha = alpha;
+  ctx.beginPath(); ctx.moveTo(x,yTop); ctx.lineTo(x,yBot); ctx.stroke();
+  const dir = yBot > yTop ? 1 : -1;
+  const headTop = [[x-headW,yTop+headH*dir],[x+headW,yTop+headH*dir],[x,yTop]];
+  const headBot = [[x-headW,yBot-headH*dir],[x+headW,yBot-headH*dir],[x,yBot]];
+  [headTop, headBot].forEach(pts=>{
+    ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]); ctx.lineTo(pts[1][0],pts[1][1]); ctx.lineTo(pts[2][0],pts[2][1]); ctx.closePath(); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawSmallLoop(cx, cy, r, color, alpha){
+  ctx.strokeStyle = color; ctx.globalAlpha = alpha; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.ellipse(cx, cy, r, r*0.4, 0, 0, Math.PI*2); ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+function drawChargeDistribution(I){
+  const topSign = I>0 ? 1 : -1;
+  const N = 30;
+  for(let i=0;i<=N;i++){
+    const y = topY + (i/N)*(baseY-topY);
+    const u = (y - antMidY)/antHalfLen;
+    const sign = u<0 ? topSign : -topSign;
+    const density = Math.abs(I) * u*u;
+    if (density < 0.03) continue;
+    const r = 1.6 + density*5.5;
+    const color = sign>0 ? '#A32D2D' : '#185FA5';
+    ctx.fillStyle = color; ctx.globalAlpha = 0.35 + 0.65*density;
+    ctx.beginPath(); ctx.arc(antennaX-11, y, r, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(antennaX+11, y, r, 0, Math.PI*2); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
+  ctx.fillStyle = topSign>0 ? '#A32D2D' : '#185FA5';
+  ctx.fillText(topSign>0?'+':'\u2212', antennaX, topY-8);
+  ctx.fillStyle = topSign>0 ? '#185FA5' : '#A32D2D';
+  ctx.fillText(topSign>0?'\u2212':'+', antennaX, baseY+22);
+  ctx.textAlign='left';
+}
+
+function drawVoltageBoard(){
+  ctx2.clearRect(0,0,W2,H2);
+  const midY = H2/2;
+  const axisColor = muted();
+  const textColor = primary();
+  const plotW = W2 - 55;
+  const ampPx = (H2/2 - 14);
+  const peakY = midY - voltage*ampPx;
+  const troughY = midY + voltage*ampPx;
+
+  ctx2.strokeStyle = axisColor; ctx2.globalAlpha = 0.3; ctx2.lineWidth = 1;
+  ctx2.beginPath();
+  ctx2.moveTo(40, midY); ctx2.lineTo(W2-10, midY);
+  ctx2.moveTo(40, 8); ctx2.lineTo(40, H2-8);
+  ctx2.stroke();
+  ctx2.globalAlpha = 1;
+
+  ctx2.strokeStyle = '#2A6FB0'; ctx2.setLineDash([5,4]); ctx2.lineWidth = 1.3; ctx2.globalAlpha = 0.7;
+  ctx2.beginPath(); ctx2.moveTo(40, peakY); ctx2.lineTo(W2-10, peakY); ctx2.stroke();
+  ctx2.beginPath(); ctx2.moveTo(40, troughY); ctx2.lineTo(W2-10, troughY); ctx2.stroke();
+  ctx2.setLineDash([]); ctx2.globalAlpha = 1;
+
+  ctx2.fillStyle = '#2A6FB0'; ctx2.font = 'bold 11px sans-serif';
+  ctx2.fillText('+V0', 6, Math.max(12,peakY+4));
+  ctx2.fillText('-V0', 6, Math.min(H2-4,troughY+4));
+  ctx2.fillStyle = textColor; ctx2.font = '11px sans-serif';
+  ctx2.fillText('0', 20, midY+4);
+  ctx2.fillText('t \u2192', W2-24, midY-6);
+
+  ctx2.strokeStyle = '#B0392E'; ctx2.lineWidth = 2.2;
+  ctx2.beginPath();
+  for(let px=0; px<=plotW; px+=3){
+    const timeBack = (plotW - px) * 0.02;
+    const v = voltage * Math.sin(phase*1.5 - timeBack*freq*1.5);
+    const x = 40 + px, y = midY - v*ampPx;
+    if (px===0) ctx2.moveTo(x,y); else ctx2.lineTo(x,y);
+  }
+  ctx2.stroke();
+
+  const nowV = voltage * Math.sin(phase*1.5);
+  const nowX = 40 + plotW, nowY = midY - nowV*ampPx;
+  ctx2.fillStyle = '#B0392E';
+  ctx2.beginPath(); ctx2.arc(nowX, nowY, 4, 0, Math.PI*2); ctx2.fill();
+  ctx2.font = 'bold 12px sans-serif';
+  ctx2.fillText('V = ' + nowV.toFixed(2), nowX-100, 18);
+}
+
+function draw(){
+  drawCircuit();
+  drawVoltageBoard();
+
+  ctx.clearRect(0,0,W,H);
+  const textColor = primary();
+
+  ctx.strokeStyle = '#8a8a86'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(groundX,480); ctx.lineTo(groundX,530); ctx.stroke();
+  [ [40,530,60],[46,542,48],[52,554,36] ].forEach(([x1,y,wid])=>{
+    ctx.beginPath(); ctx.moveTo(groundX-wid/2,y); ctx.lineTo(groundX+wid/2,y); ctx.stroke();
+  });
+  ctx.fillStyle = textColor; ctx.font = 'italic 12px Georgia, serif';
+  ctx.fillText('Earth', groundX-14, 573);
+
+  ctx.strokeStyle = textColor; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(groundX,480); ctx.lineTo(sourceX-sourceR,480);
+  ctx.moveTo(sourceX+sourceR,480); ctx.lineTo(antennaX,480);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#2A6FB0'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(sourceX,sourceY,sourceR,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle = '#B0392E'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for(let i=0;i<=40;i++){
+    const t = i/40;
+    const x = sourceX - 22 + t*44;
+    const y = sourceY + 10*voltage*Math.sin(t*Math.PI*2 + phase*1.5);
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.fillStyle = textColor; ctx.font = 'italic 12px Georgia, serif';
+  ctx.fillText('a.c. source', sourceX-36, sourceY-50);
+
+  const I = Math.sin(phase);
+
+  const antAlpha = 0.5 + 0.5*Math.min(1, voltage*Math.abs(I));
+  ctx.strokeStyle = I>0 ? '#B0392E' : '#7A2A22';
+  ctx.globalAlpha = antAlpha;
+  ctx.lineWidth = 6 + 4*voltage;
+  ctx.beginPath(); ctx.moveTo(antennaX, baseY); ctx.lineTo(antennaX, topY+16); ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = ctx.strokeStyle;
+  ctx.beginPath();
+  ctx.moveTo(antennaX-14, topY+20); ctx.lineTo(antennaX+14, topY+20); ctx.lineTo(antennaX, topY); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = textColor; ctx.font = 'italic 13px Georgia, serif';
+  ctx.fillText('Antenna', antennaX+34, baseY-15);
+
+  drawChargeDistribution(I);
+
+  const maxR = 62 * voltage;
+  const spacing = maxR / numRings;
+
+  stations.forEach(st=>{
+    const wireDelay = spreadSpeed * (baseY - st.y) / 130;
+    const localPhase = phase - wireDelay;
+    const localWaveT = (waveT - wireDelay*20);
+
+    const radii = [];
+    for(let i=0;i<numRings;i++){
+      let r = ((localWaveT + i*spacing) % maxR);
+      if (r < 0) r += maxR;
+      radii.push(r);
+    }
+    const outerR = Math.max(...radii);
+
+    radii.forEach(r=>{
+      const growthFrac = r / maxR;
+      const val = Math.sin(localPhase - growthFrac*Math.PI*2);
+      const fadeEdge = 1 - Math.pow(growthFrac, 3);
+
+      ctx.strokeStyle = st.color;
+      ctx.globalAlpha = (0.3 + 0.5*Math.abs(val)) * fadeEdge;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for(let d=0; d<=360; d+=8){
+        const p = ringPoint(antennaX, st.y, r, d*Math.PI/180);
+        if(d===0) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y);
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      const eLen = voltage * (14 + r*0.5) * val;
+      angles8.forEach(a=>{
+        const p = ringPoint(antennaX, st.y, r, a);
+        const yTop = p.y - eLen/2, yBot = p.y + eLen/2;
+        drawArrow(p.x, yTop, yBot, '#2C2C2A', (0.45 + 0.5*Math.abs(val)) * fadeEdge, 4.5, 7);
+
+        if (r === outerR){
+          const genR = 12*voltage;
+          const genVal = Math.sin(localPhase - growthFrac*Math.PI*2 - 0.5);
+          const genAlpha = (0.15 + 0.35*Math.abs(genVal)) * fadeEdge;
+          [yTop, yBot].forEach(tipY=>{
+            drawSmallLoop(p.x, tipY, genR, st.color, genAlpha);
+            const genLen = genR * 0.6 * genVal;
+            angles4.forEach(a2=>{
+              const p2 = ringPoint(p.x, tipY, genR, a2);
+              drawArrow(p2.x, p2.y - genLen/2, p2.y + genLen/2, '#2C2C2A', genAlpha*0.8, 2, 3.5);
+            });
+          });
+        }
+      });
+    });
+
+    ctx.fillStyle = st.color; ctx.font = 'italic bold 12px Georgia, serif';
+    ctx.fillText('B', antennaX + maxR + 20, st.y + 4);
+  });
+
+  if (running){
+    phase += 0.05*freq;
+    waveT += 0.9*spreadSpeed;
+  }
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+})();
+</script>
+
+
+
+</body></html>
